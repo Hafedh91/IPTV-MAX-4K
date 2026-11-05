@@ -10,33 +10,37 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-      - name: Install Java 17
+      - uses: actions/checkout@v4
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-      - name: Install Android SDK 35
+      - name: Install SDK components
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
           sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
-      - name: Show build environment
+      - name: Build APK and capture diagnostics
+        shell: bash
         run: |
-          java -version
-          gradle --version
-          ls -la app/src/main/assets
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace --info --no-daemon
-      - name: Upload installable APK
+          set -o pipefail
+          gradle :app:assembleDebug --stacktrace --no-daemon 2>&1 | tee build-log.txt
+      - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: IPTV-MAX-4K-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Upload build error log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: IPTV-MAX-4K-build-log
+          path: build-log.txt
+          if-no-files-found: warn
